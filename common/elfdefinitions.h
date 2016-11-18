@@ -410,6 +410,12 @@ _ELF_DEFINE_EF(EF_MIPS_ABI2,        0x00000020UL,			\
 	"file follows MIPS III 32-bit ABI")				\
 _ELF_DEFINE_EF(EF_MIPS_OPTIONS_FIRST, 0x00000080UL,			\
 	"ld(1) should process .MIPS.options section first")		\
+_ELF_DEFINE_EF(EF_MIPS_CHERI_128, 0x00000100UL,				\
+	"4 bit MIPS CHERI flags field")					\
+_ELF_DEFINE_EF(EF_MIPS_CHERI_256, 0x00000200UL,				\
+	"4 bit MIPS CHERI flags field")					\
+_ELF_DEFINE_EF(EF_MIPS_CHERI_MASK, 0x00000f00UL,			\
+	"4 bit MIPS CHERI flags field")					\
 _ELF_DEFINE_EF(EF_MIPS_ARCH_ASE,    0x0F000000UL,			\
 	"file uses application-specific architectural extensions")	\
 _ELF_DEFINE_EF(EF_MIPS_ARCH_ASE_MDMX, 0x08000000UL,			\
@@ -819,7 +825,8 @@ _ELF_DEFINE_EM(EM_KMX32,            211, "KM211 KMX32 32-bit processor") \
 _ELF_DEFINE_EM(EM_KMX16,            212, "KM211 KMX16 16-bit processor") \
 _ELF_DEFINE_EM(EM_KMX8,             213, "KM211 KMX8 8-bit processor")  \
 _ELF_DEFINE_EM(EM_KVARC,            214, "KM211 KMX32 KVARC processor") \
-_ELF_DEFINE_EM(EM_RISCV,            243, "RISC-V")
+_ELF_DEFINE_EM(EM_RISCV,            243, "RISC-V") \
+_ELF_DEFINE_EM(EM_MIPS_CHERI,       0xC256, "MIPS with CHERI")
 
 #undef	_ELF_DEFINE_EM
 #define	_ELF_DEFINE_EM(N, V, DESCR)	N = V ,
@@ -885,7 +892,7 @@ _ELF_DEFINE_PF(PF_ARM_SB,           0x10000000,				\
 _ELF_DEFINE_PF(PF_ARM_PI,           0x20000000,				\
 	"segment is position-independent")				\
 _ELF_DEFINE_PF(PF_ARM_ABS,          0x40000000,				\
-	"segment must be loaded at its base address")
+	"segment must be loaded at its base address")			\
 
 #undef	_ELF_DEFINE_PF
 #define	_ELF_DEFINE_PF(N, V, DESCR)	N = V ,

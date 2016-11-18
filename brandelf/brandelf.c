@@ -30,6 +30,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <assert.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -81,6 +82,10 @@ static struct ELFtypes elftypes[] = {
 	{ "Tru64",	ELFOSABI_TRU64 }
 };
 
+#ifndef EM_MIPS_CHERI
+#define	EM_MIPS_CHERI	0xC256
+#endif
+
 static struct option brandelf_longopts[] = {
 	{ "help",	no_argument,	NULL,   'h' },
 	{ "version",	no_argument,	NULL, 	'V' },
@@ -96,17 +101,37 @@ main(int argc, char **argv)
 	int type = ELFOSABI_NONE;
 	int retval = 0;
 	int ch, change = 0, force = 0, listed = 0;
+	int cheri = 0;
 
 	if (elf_version(EV_CURRENT) == EV_NONE)
 		errx(EXIT_FAILURE, "elf_version error");
 
-	while ((ch = getopt_long(argc, argv, "Vf:hlt:v", brandelf_longopts,
+	while ((ch = getopt_long(argc, argv, "Vc:f:hlt:v", brandelf_longopts,
 		NULL)) != -1)
 		switch (ch) {
+		case 'c':
+			if (force)
+				errx(EXIT_FAILURE, "ERROR: the -c option is "
+				    "incompatible with the -f option.");
+			if (change)
+				errx(EXIT_FAILURE, "ERROR: the -c option is "
+				    "incompatible with the -t option.");
+			cheri = atoi(optarg);
+			if (errno == ERANGE || (cheri != 128 && cheri != 256)) {
+				warnx("invalid argument to option c: %s",
+				    optarg);
+				usage();
+			}
+			type = ELFOSABI_FREEBSD;
+			change = 1;
+			break;
 		case 'f':
 			if (change)
 				errx(EXIT_FAILURE, "ERROR: the -f option is "
 				    "incompatible with the -t option.");
+			if (cheri)
+				errx(EXIT_FAILURE, "ERROR: the -f option is "
+				    "incompatible with the -c option.");
 			force = 1;
 			type = atoi(optarg);
 			if (errno == ERANGE || type < 0 || type > 255) {
@@ -129,8 +154,12 @@ main(int argc, char **argv)
 			if (force)
 				errx(EXIT_FAILURE, "the -t option is "
 				    "incompatible with the -f option.");
+			if (cheri)
+				errx(EXIT_FAILURE, "the -t option is "
+				    "incompatible with the -c option.");
 			if ((type = elftype(optarg)) == -1) {
 				warnx("ERROR: invalid ELF type '%s'", optarg);
+				printelftypes();
 				usage();
 			}
 
@@ -210,6 +239,44 @@ main(int argc, char **argv)
 				goto fail;
 			}
 
+			if (cheri) {
+				int e_data = ehdr.e_ident[EI_DATA];
+				if (e_data != ELFDATA2LSB
+				    && e_data != ELFDATA2MSB) {
+					warnx("file '%s' has unknown endianness"
+					    "%u", argv[0], e_data);
+					retval = 1;
+					goto fail;
+				}
+				if (gelf_getclass(elf) != ELFCLASS64) {
+					/* No CHERI on 32-bit architectures */
+					warnx("file '%s' not supported by"
+					    " cheri because it is not a 64-bit"
+					    " file.", argv[0]);
+					retval = 1;
+					goto fail;
+				}
+				if (ehdr.e_machine == EM_MIPS_CHERI) {
+					/* nothing to change here */
+				} else if (ehdr.e_machine == EM_MIPS) {
+					ehdr.e_machine = EM_MIPS_CHERI;
+				} else {
+					warnx("file '%s' not a CHERI platform:"
+					    " %u", argv[0], ehdr.e_machine);
+					retval = 1;
+					goto fail;
+				}
+				/* clear the cheri specific flags */
+				ehdr.e_flags &= ~EF_MIPS_CHERI_MASK;
+				if (cheri == 128) {
+					ehdr.e_flags |= EF_MIPS_CHERI_128;
+				} else if (cheri == 256) {
+					ehdr.e_flags |= EF_MIPS_CHERI_256;
+				} else {
+					/* should have been checked above */
+					assert("cheri must be 128 or 256");
+				}
+			}
 			/*
 			 * Update the ABI type.
 			 */
@@ -255,6 +322,7 @@ Usage: %s [options] file...\n\
   -h | --help               Print a usage message and exit.\n\
   -l                        List known ELF ABI names.\n\
   -t ABI                    Set the ELF ABI to the value named by \"ABI\".\n\
+  -c CHERI_capability_size  Set the ELF ABI to CHERI MIPS with given cap size\n\
   -V | --version            Print a version identifier and exit.\n"
 
 static void
